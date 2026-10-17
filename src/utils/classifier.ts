@@ -48,8 +48,8 @@ export function clientClassify(text: string): RouteResult {
   if (lower.includes('swiggy ne bina vajah') || lower.includes('fine laga diya') || lower.includes('id suspend')) {
     grievanceScore += 10;
   }
-  if (lower.includes('e-shram') || lower.includes('eshram') || lower.includes('card kaise banega')) {
-    welfareScore += 10;
+  if (lower.includes('e-shram') || lower.includes('eshram') || lower.includes('card kaise banega') || lower.includes('accident insurance') || lower.includes('accident bima')) {
+    welfareScore += 15;
   }
   if (lower.includes('rides ki') || lower.includes('fuel me gaye') || lower.includes('kamaye')) {
     earningsScore += 10;

@@ -1,6 +1,8 @@
 export type CategoryToken = 'EARNINGS_TRACKING' | 'WELFARE_SCHEMES' | 'GRIEVANCE_DRAFTING';
 
 export type LanguageMode = 'en' | 'hi' | 'hinglish';
+export type TextScale = 'normal' | 'large' | 'xlarge';
+export type DayMode = 'standard' | 'daylight';
 
 export interface RouteResult {
   category: CategoryToken;

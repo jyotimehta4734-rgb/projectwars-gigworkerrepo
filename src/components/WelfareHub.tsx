@@ -12,17 +12,27 @@ import {
   Award,
   BookOpen,
   ArrowRight,
-  HelpCircle
+  HelpCircle,
+  Volume2,
+  Copy,
+  CheckCheck,
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
-import { LanguageMode, WelfareScheme } from '../types';
+import { LanguageMode, WelfareScheme, TextScale } from '../types';
 import { WELFARE_SCHEMES_DATA } from '../data/schemes';
 
 interface WelfareHubProps {
   lang: LanguageMode;
+  textScale?: TextScale;
   initialQuery?: string;
 }
 
-export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) => {
+export const WelfareHub: React.FC<WelfareHubProps> = ({
+  lang,
+  textScale = 'normal',
+  initialQuery,
+}) => {
   const [search, setSearch] = useState(
     initialQuery && initialQuery.toLowerCase().includes('e-shram') ? 'e-shram' : ''
   );
@@ -38,6 +48,12 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
   );
   const [advisorLoading, setAdvisorLoading] = useState(false);
   const [copiedAdvisor, setCopiedAdvisor] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Interactive 30-Second Eligibility Quiz State
+  const [quizRole, setQuizRole] = useState<'delivery' | 'driver' | 'labor'>('delivery');
+  const [quizAge, setQuizAge] = useState<number>(26);
+  const [hasAadhaar, setHasAadhaar] = useState<boolean>(true);
 
   const handleAskAdvisor = async (customQ?: string) => {
     const q = customQ || advisorQuery;
@@ -70,19 +86,26 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
     setTimeout(() => setCopiedAdvisor(false), 2000);
   };
 
-  const handleSpeakAdvisor = () => {
+  const handleSpeakText = (text: string) => {
     if (typeof window === 'undefined') return;
-    const utterance = new SpeechSynthesisUtterance(advisorOutput.replace(/[*•]/g, ' '));
+    window.speechSynthesis.cancel();
+
+    if (isPlayingAudio) {
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    const clean = text.replace(/[*#|•`-]/g, ' ');
+    const utterance = new SpeechSynthesisUtterance(clean);
     utterance.rate = 0.95;
     utterance.lang = 'hi-IN';
+
+    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+
     window.speechSynthesis.speak(utterance);
   };
-
-  // Eligibility quiz state
-  const [quizAge, setQuizAge] = useState<number>(26);
-  const [quizIncome, setQuizIncome] = useState<number>(14000);
-  const [quizRole, setQuizRole] = useState<string>('delivery');
-  const [hasAadhaarLinked, setHasAadhaarLinked] = useState<boolean>(true);
 
   const filteredSchemes = WELFARE_SCHEMES_DATA.filter((scheme) => {
     const matchesCategory =
@@ -97,9 +120,9 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Banner */}
-      <div className="bg-blue-900 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-blue-950 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-blue-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-blue-300 text-xs font-mono font-bold tracking-wider uppercase mb-1">
+          <div className="flex items-center gap-2 text-blue-400 text-xs font-mono font-bold tracking-wider uppercase mb-1">
             <ShieldCheck className="w-4 h-4" />
             <span>WELFARE_SCHEMES DIRECTORY & GUIDANCE</span>
           </div>
@@ -115,25 +138,25 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-blue-950/60 p-3 rounded-xl border border-blue-700/50 text-xs text-blue-200">
-          <Phone className="w-4 h-4 text-emerald-400" />
+        <div className="flex items-center gap-2.5 bg-blue-900/60 p-3.5 rounded-xl border border-blue-700/60 text-xs text-blue-200">
+          <Phone className="w-5 h-5 text-emerald-400 shrink-0" />
           <div>
-            <div className="font-semibold text-white">e-Shram Toll-Free</div>
-            <div>14434 (All India)</div>
+            <div className="font-bold text-white text-sm">e-Shram Toll-Free: 14434</div>
+            <div className="text-[11px] text-blue-300">National Worker Helpdesk (24/7)</div>
           </div>
         </div>
       </div>
 
-      {/* Interactive Welfare & Legal Rights Advisor (Yojana & Adhikar Saathi) */}
-      <div className="bg-gradient-to-br from-blue-950 via-slate-900 to-neutral-950 text-white rounded-2xl p-5 sm:p-6 shadow-lg border border-blue-500/30">
+      {/* ADVISOR INTERACTIVE CARD */}
+      <div className="bg-gradient-to-br from-blue-950 via-slate-900 to-neutral-950 text-white rounded-2xl p-5 sm:p-6 shadow-lg border border-blue-500/40">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-blue-800/60 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center border border-blue-400/30">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center border border-blue-400/30">
               <ShieldCheck className="w-5 h-5 text-blue-400" />
             </div>
             <div>
               <h3 className="font-bold text-base sm:text-lg text-white flex items-center gap-2">
-                Welfare & Legal Rights Advisor for Informal Workers
+                Welfare & Legal Rights Advisor (योजना व अधिकार साथी)
                 <span className="text-[10px] font-mono uppercase bg-blue-400 text-neutral-950 font-black px-1.5 py-0.5 rounded">
                   Adhikar AI
                 </span>
@@ -146,17 +169,28 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleSpeakAdvisor}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-blue-300 text-xs flex items-center gap-1 border border-white/10"
+              onClick={() => handleSpeakText(advisorOutput)}
+              className="p-2 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-blue-300 text-xs font-bold flex items-center gap-1.5 border border-white/10"
               title="Listen to Advice"
             >
-              <span>Bolke Sunao</span>
+              <Volume2 className="w-4 h-4" />
+              <span>{isPlayingAudio ? 'Stop Bolna' : 'Bolke Sunao'}</span>
             </button>
             <button
               onClick={handleCopyAdvisor}
-              className="px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1 shadow-xs"
+              className="px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs"
             >
-              {copiedAdvisor ? <span>Copied!</span> : <span>Copy Advice</span>}
+              {copiedAdvisor ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Advice</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -174,12 +208,12 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
                 }
               }}
               placeholder='e.g., "Accident insurance ka kya process hai delivery boys ke liye?"'
-              className="flex-1 p-3 rounded-xl bg-neutral-900 border border-blue-500/40 text-white text-sm focus:border-blue-400 outline-none placeholder:text-neutral-500"
+              className="flex-1 p-3.5 rounded-xl bg-neutral-900 border border-blue-500/40 text-white text-sm focus:border-blue-400 outline-none placeholder:text-neutral-500"
             />
             <button
               onClick={() => handleAskAdvisor()}
               disabled={advisorLoading}
-              className="px-5 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-neutral-950 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1.5"
+              className="px-6 py-3.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-neutral-950 font-black text-xs uppercase tracking-wider transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-2"
             >
               {advisorLoading ? (
                 <span>Checking Rights...</span>
@@ -194,16 +228,16 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
 
           {/* Quick Benchmark Presets */}
           <div className="flex items-center gap-1.5 flex-wrap text-xs">
-            <span className="text-neutral-400 text-[11px]">Popular Questions:</span>
+            <span className="text-neutral-400 text-[11px] font-semibold">1-Tap Scenarios:</span>
             <button
               onClick={() => {
                 const q = 'Accident insurance ka kya process hai delivery boys ke liye?';
                 setAdvisorQuery(q);
                 handleAskAdvisor(q);
               }}
-              className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all font-medium"
             >
-              "Accident insurance process"
+              "Accident insurance ₹20/year"
             </button>
             <button
               onClick={() => {
@@ -211,7 +245,7 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
                 setAdvisorQuery(q);
                 handleAskAdvisor(q);
               }}
-              className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all font-medium"
             >
               "e-Shram card kaise banega"
             </button>
@@ -221,7 +255,7 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
                 setAdvisorQuery(q);
                 handleAskAdvisor(q);
               }}
-              className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all font-medium"
             >
               "PM-SYM ₹3000 pension"
             </button>
@@ -231,116 +265,145 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
                 setAdvisorQuery(q);
                 handleAskAdvisor(q);
               }}
-              className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-neutral-200 text-xs border border-white/10 transition-all font-medium"
             >
-              "Rajasthan Gig Workers Act"
+              "Rajasthan Gig Act cess"
             </button>
           </div>
         </div>
 
-        {/* Formatted 3-Component Advice Output Box */}
+        {/* Output Box */}
         <div className="mt-4 pt-4 border-t border-blue-800/60">
-          <div className="bg-neutral-950 rounded-xl p-4 sm:p-5 border border-blue-500/30 text-blue-100 font-sans text-sm leading-relaxed whitespace-pre-wrap">
+          <div className="bg-neutral-950 rounded-xl p-4 sm:p-5 border border-blue-500/30 text-blue-100 font-sans text-sm leading-relaxed whitespace-pre-wrap shadow-inner">
             {advisorOutput}
           </div>
         </div>
       </div>
 
-      {/* Interactive e-Shram Special Guide Card (Top Prompt Example Focus) */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-[11px] font-mono font-bold uppercase bg-blue-200 text-blue-900 px-2 py-0.5 rounded">
-              Frequently Asked: "Mera e-shram card kaise banega?"
-            </span>
-            <h3 className="text-lg font-bold text-neutral-900">
-              {lang === 'hi'
-                ? 'ई-श्रम कार्ड स्वयं 5 मिनट में अपने मोबाइल से कैसे बनाएं?'
-                : 'How to make your e-Shram UAN Card in 5 minutes from mobile'}
-            </h3>
-            <p className="text-xs text-neutral-600 max-w-2xl">
-              Free registration on eshram.gov.in. All Swiggy, Zomato, Uber, Ola, Porter, and daily-wage workers get a 12-digit UAN number and ₹2 Lakh free accidental insurance.
-            </p>
-          </div>
-
-          <a
-            href="https://eshram.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition-all shadow-xs shrink-0"
-          >
-            <span>Visit eshram.gov.in</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+      {/* Interactive 30-Second Eligibility Quiz */}
+      <div className="bg-white rounded-2xl border border-neutral-300 p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center gap-2">
+          <UserCheck className="w-5 h-5 text-blue-700" />
+          <h3 className="font-bold text-neutral-900 text-base">
+            30-Second Interactive Scheme Matcher (आप किन योजनाओं के हकदार हैं?)
+          </h3>
         </div>
 
-        {/* 3 Step Quick Guide */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-3 border-t border-blue-200/60 text-xs">
-          <div className="flex items-start gap-2.5 p-2 rounded-lg bg-white/70">
-            <div className="w-6 h-6 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              1
-            </div>
-            <div>
-              <div className="font-bold text-neutral-900">Aadhaar OTP Verify</div>
-              <div className="text-neutral-500 text-[11px]">Enter Aadhaar & OTP received on your mobile.</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label className="block font-bold text-neutral-700 mb-1.5">Aapka Kaam (Role):</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => setQuizRole('delivery')}
+                className={`py-2 px-1 rounded-lg text-center font-bold border transition-all ${
+                  quizRole === 'delivery'
+                    ? 'bg-blue-800 text-white border-blue-800'
+                    : 'bg-neutral-100 text-neutral-700 border-neutral-300'
+                }`}
+              >
+                🛵 Delivery
+              </button>
+              <button
+                onClick={() => setQuizRole('driver')}
+                className={`py-2 px-1 rounded-lg text-center font-bold border transition-all ${
+                  quizRole === 'driver'
+                    ? 'bg-blue-800 text-white border-blue-800'
+                    : 'bg-neutral-100 text-neutral-700 border-neutral-300'
+                }`}
+              >
+                🚗 Cab/Auto
+              </button>
+              <button
+                onClick={() => setQuizRole('labor')}
+                className={`py-2 px-1 rounded-lg text-center font-bold border transition-all ${
+                  quizRole === 'labor'
+                    ? 'bg-blue-800 text-white border-blue-800'
+                    : 'bg-neutral-100 text-neutral-700 border-neutral-300'
+                }`}
+              >
+                🛠️ Labor
+              </button>
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 p-2 rounded-lg bg-white/70">
-            <div className="w-6 h-6 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              2
-            </div>
-            <div>
-              <div className="font-bold text-neutral-900">Select Gig / Delivery Occupation</div>
-              <div className="text-neutral-500 text-[11px]">Choose 'Delivery Partner' or 'Driver' in NCO occupation code.</div>
-            </div>
+          <div>
+            <label className="block font-bold text-neutral-700 mb-1.5">
+              Aapki Umar (Age): <strong className="text-blue-700 text-sm">{quizAge} saal</strong>
+            </label>
+            <input
+              type="range"
+              min={18}
+              max={65}
+              value={quizAge}
+              onChange={(e) => setQuizAge(Number(e.target.value))}
+              className="w-full accent-blue-600 cursor-pointer mt-2"
+            />
           </div>
 
-          <div className="flex items-start gap-2.5 p-2 rounded-lg bg-white/70">
-            <div className="w-6 h-6 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              3
-            </div>
-            <div>
-              <div className="font-bold text-neutral-900">Download UAN Card</div>
-              <div className="text-neutral-500 text-[11px]">Instant PDF download with your 12-digit permanent identity.</div>
-            </div>
+          <div>
+            <label className="block font-bold text-neutral-700 mb-1.5">Aadhaar Linked Mobile:</label>
+            <button
+              onClick={() => setHasAadhaar(!hasAadhaar)}
+              className={`w-full py-2 px-3 rounded-lg font-bold border transition-all text-left flex items-center justify-between ${
+                hasAadhaar
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-red-50 text-red-800 border-red-300'
+              }`}
+            >
+              <span>{hasAadhaar ? '✓ Haan, linked hai' : '✗ Nahi hai'}</span>
+              <span className="text-[10px] font-normal underline">Tap to toggle</span>
+            </button>
           </div>
+        </div>
+
+        {/* Matched Schemes Badge Strip */}
+        <div className="pt-2 border-t border-neutral-200 flex items-center gap-2 flex-wrap text-xs">
+          <span className="font-bold text-neutral-800">You Qualify For:</span>
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">
+            ✓ e-Shram UAN Card (₹2 Lakh Accident Cover)
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold border border-blue-300">
+            ✓ PMSBY (₹20/year ₹2L Bima)
+          </span>
+          {quizAge <= 40 && (
+            <span className="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 font-bold border border-purple-300">
+              ✓ PM-SYM (₹3,000/mo Pension)
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Schemes Catalog & Details */}
+      {/* Schemes Catalog & Deep Dive */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left List of Schemes */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search schemes (e.g. e-shram, pension, ayushman)..."
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-neutral-300 text-xs focus:border-blue-500 outline-none bg-white"
-              />
-            </div>
+          <div className="relative">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search schemes (e.g. e-shram, pension, ayushman)..."
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-neutral-300 text-xs focus:border-blue-500 outline-none bg-white font-medium"
+            />
           </div>
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
             {filteredSchemes.map((scheme) => {
               const isSelected = selectedScheme.id === scheme.id;
               return (
                 <div
                   key={scheme.id}
                   onClick={() => setSelectedScheme(scheme)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-blue-50/80 border-blue-500 shadow-xs ring-1 ring-blue-400'
+                      ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-400'
                       : 'bg-white border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                   }`}
                 >
                   <div className="flex items-center justify-between text-[11px] mb-1">
-                    <span className="font-semibold text-neutral-500 uppercase">{scheme.category}</span>
-                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-800">
+                    <span className="font-bold text-neutral-500 uppercase">{scheme.category}</span>
+                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-800">
                       {scheme.badge}
                     </span>
                   </div>
@@ -357,21 +420,36 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
         </div>
 
         {/* Right Active Scheme Deep-Dive */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-300 p-5 shadow-xs space-y-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-300 p-5 sm:p-6 shadow-xs space-y-5">
           <div className="border-b border-neutral-200 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-300">
                 {selectedScheme.badge}
               </span>
-              <a
-                href={selectedScheme.officialUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"
-              >
-                <span>Official Portal</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    handleSpeakText(
+                      `${selectedScheme.name}. ${selectedScheme.description}. Benefits: ${selectedScheme.benefits.join(
+                        '. '
+                      )}`
+                    )
+                  }
+                  className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded bg-neutral-100 hover:bg-neutral-200 text-neutral-800"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Suno</span>
+                </button>
+                <a
+                  href={selectedScheme.officialUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline"
+                >
+                  <span>Official Portal</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
 
             <h3 className="text-xl font-black text-neutral-900">
@@ -391,7 +469,7 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
               {selectedScheme.benefits.map((b, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 p-2.5 rounded-lg bg-blue-50/50 border border-blue-100 text-xs text-neutral-800"
+                  className="flex items-start gap-2 p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-neutral-800 font-medium"
                 >
                   <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span>{b}</span>
@@ -403,7 +481,7 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
           {/* Eligibility Criteria */}
           <div>
             <h4 className="text-xs uppercase font-mono font-bold text-neutral-500 mb-2">
-              Who is Eligible?
+              Who is Eligible? (पात्रता)
             </h4>
             <ul className="space-y-1.5 text-xs text-neutral-700">
               {selectedScheme.eligibility.map((e, idx) => (
@@ -416,15 +494,15 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
           </div>
 
           {/* Required Documents */}
-          <div className="bg-neutral-50 rounded-lg p-3.5 border border-neutral-200">
-            <h4 className="text-xs uppercase font-mono font-bold text-neutral-600 mb-1.5">
-              Required Documents
+          <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
+            <h4 className="text-xs uppercase font-mono font-bold text-neutral-700 mb-2">
+              Required Documents (ज़रूरी दस्तावेज़)
             </h4>
             <div className="flex flex-wrap gap-2">
               {selectedScheme.requiredDocs.map((doc, idx) => (
                 <span
                   key={idx}
-                  className="text-xs bg-white px-2.5 py-1 rounded-md border border-neutral-300 font-medium text-neutral-800"
+                  className="text-xs bg-white px-3 py-1.5 rounded-lg border border-neutral-300 font-bold text-neutral-800 shadow-2xs"
                 >
                   {doc}
                 </span>
@@ -434,11 +512,11 @@ export const WelfareHub: React.FC<WelfareHubProps> = ({ lang, initialQuery }) =>
 
           {/* Helpline Footer */}
           <div className="flex items-center justify-between pt-2 border-t border-neutral-200 text-xs text-neutral-600">
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 font-medium">
               <Phone className="w-4 h-4 text-emerald-600" />
               <span>National Helpline: <strong className="text-neutral-900">{selectedScheme.helpline}</strong></span>
             </span>
-            <span className="text-neutral-400">Government of India / State Labour Dept</span>
+            <span className="text-neutral-400">Govt of India / State Labour Dept</span>
           </div>
         </div>
       </div>

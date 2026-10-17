@@ -12,34 +12,41 @@ import {
   RefreshCw,
   Terminal,
   Layers,
-  Code
+  Play,
+  RotateCcw,
+  CheckCircle2,
+  HelpCircle
 } from 'lucide-react';
-import { CategoryToken, LanguageMode, RouteResult } from '../types';
+import { CategoryToken, LanguageMode, RouteResult, TextScale } from '../types';
 import { PROMPT_EXAMPLES } from '../data/examples';
 import { routeInput } from '../utils/classifier';
 
 interface RouterHeroProps {
   lang: LanguageMode;
+  textScale?: TextScale;
   onNavigateToCategory: (category: CategoryToken, initialQuery?: string) => void;
   onClassified: (res: RouteResult) => void;
 }
 
 export const RouterHero: React.FC<RouterHeroProps> = ({
   lang,
+  textScale = 'normal',
   onNavigateToCategory,
   onClassified,
 }) => {
   const [input, setInput] = useState('Sir, Swiggy ne bina vajah Rs 500 ka fine laga diya, help karo');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RouteResult | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | CategoryToken>('all');
-  const [showInspector, setShowInspector] = useState(true);
   const [multiAgentResponse, setMultiAgentResponse] = useState<string>('');
   const [pipelineDetails, setPipelineDetails] = useState<any>(null);
+  const [copiedToken, setCopiedToken] = useState(false);
   const [copiedResponse, setCopiedResponse] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [speechRate, setSpeechRate] = useState<number>(0.95);
+  const [activeFilter, setActiveFilter] = useState<'all' | CategoryToken>('all');
+  const [currentStep, setCurrentStep] = useState<number>(3); // 1: Input, 2: Agent A, 3: Agent B & C
 
   // Check speech recognition support
   useEffect(() => {
@@ -52,7 +59,7 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
     }
   }, []);
 
-  // Initial classification run for the default prompt example
+  // Initial classification run
   useEffect(() => {
     handleClassify('Sir, Swiggy ne bina vajah Rs 500 ka fine laga diya, help karo');
   }, []);
@@ -62,6 +69,7 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
     if (!text) return;
 
     setLoading(true);
+    setCurrentStep(2);
     try {
       const [res, chatRes] = await Promise.all([
         routeInput(text),
@@ -76,6 +84,7 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
 
       setResult(res);
       onClassified(res);
+      setCurrentStep(3);
 
       if (chatRes?.textResponse) {
         setMultiAgentResponse(chatRes.textResponse);
@@ -91,8 +100,15 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
   const handleCopyToken = () => {
     if (!result) return;
     navigator.clipboard.writeText(result.token);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 2000);
+  };
+
+  const handleCopyResponse = () => {
+    if (!multiAgentResponse) return;
+    navigator.clipboard.writeText(multiAgentResponse);
+    setCopiedResponse(true);
+    setTimeout(() => setCopiedResponse(false), 2000);
   };
 
   const handleSpeechToggle = () => {
@@ -138,18 +154,24 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
     }
   };
 
-  const handleSpeakOutput = () => {
-    if (!result || typeof window === 'undefined') return;
-    const msg =
-      result.token === 'EARNINGS_TRACKING'
-        ? 'Categorized as Earnings Tracking. Opening daily wage and fuel calculation.'
-        : result.token === 'WELFARE_SCHEMES'
-        ? 'Categorized as Welfare Schemes. Opening government benefits and e-Shram guide.'
-        : 'Categorized as Grievance Drafting. Opening dispute resolution and penalty appeal.';
+  const handleSpeakText = (textToSpeak: string) => {
+    if (typeof window === 'undefined') return;
+    window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(msg);
-    utterance.rate = 1.0;
-    utterance.lang = 'en-US';
+    if (isPlayingAudio) {
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    const cleanText = textToSpeak.replace(/[*#|•`-]/g, ' ');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = speechRate;
+    utterance.lang = lang === 'hi' ? 'hi-IN' : 'hi-IN';
+
+    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+
     window.speechSynthesis.speak(utterance);
   };
 
@@ -157,76 +179,172 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
     switch (token) {
       case 'EARNINGS_TRACKING':
         return {
-          bg: 'bg-emerald-50 border-emerald-300 text-emerald-950',
-          badge: 'bg-emerald-700 text-white',
-          accent: 'text-emerald-700',
+          bg: 'bg-emerald-50 border-emerald-400 text-emerald-950',
+          badge: 'bg-emerald-800 text-white',
+          accent: 'text-emerald-800',
           border: 'border-emerald-500',
-          title: 'Earnings Tracking',
+          title: 'Earnings Tracking (कमाई का हिसाब)',
           hindiTitle: 'कमाई व पेट्रोल/CNG हिसाब',
-          actionText: 'Open Earnings & Fuel Calculator',
+          actionText: 'Open Full Earnings Calculator',
           actionTab: 'earnings' as const,
         };
       case 'WELFARE_SCHEMES':
         return {
-          bg: 'bg-blue-50 border-blue-300 text-blue-950',
-          badge: 'bg-blue-700 text-white',
-          accent: 'text-blue-700',
+          bg: 'bg-blue-50 border-blue-400 text-blue-950',
+          badge: 'bg-blue-800 text-white',
+          accent: 'text-blue-800',
           border: 'border-blue-500',
-          title: 'Welfare Schemes',
+          title: 'Welfare Schemes (सरकारी योजनाएं व अधिकार)',
           hindiTitle: 'सरकारी योजनाएं व ई-श्रम पोर्टल',
           actionText: 'Explore Welfare & e-Shram Portal',
           actionTab: 'welfare' as const,
         };
       case 'GRIEVANCE_DRAFTING':
         return {
-          bg: 'bg-amber-50 border-amber-300 text-amber-950',
-          badge: 'bg-amber-700 text-white',
+          bg: 'bg-amber-50 border-amber-400 text-amber-950',
+          badge: 'bg-amber-800 text-white',
           accent: 'text-amber-800',
           border: 'border-amber-500',
-          title: 'Grievance Drafting',
+          title: 'Grievance Drafting (फाइन व आईडी अपील)',
           hindiTitle: 'शिकायत, फाइन व आईडी सस्पेंशन अपील',
-          actionText: 'Draft Formal Appeal Letter',
+          actionText: 'Draft Corporate Appeal Letter',
           actionTab: 'grievance' as const,
         };
     }
   };
 
   return (
-    <section className="py-6 sm:py-8 max-w-7xl mx-auto px-4 sm:px-6">
-      {/* Hero Header */}
-      <div className="text-center max-w-3xl mx-auto mb-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-semibold mb-3 border border-orange-200">
-          <Zap className="w-3.5 h-3.5 text-orange-600" />
-          <span>Core Routing Agent Engine · Exact Token Resolution</span>
+    <section className="py-6 max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+      {/* Hero Title */}
+      <div className="text-center max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-100 text-orange-900 text-xs font-bold mb-3 border border-orange-200 shadow-2xs">
+          <Zap className="w-4 h-4 text-orange-600 fill-orange-500" />
+          <span>Core AI Routing & Multi-Agent Assistant for Gig Workers</span>
         </div>
-        <h2 className="text-2xl sm:text-4xl font-black text-neutral-900 tracking-tight">
+        <h2 className={`font-black text-neutral-900 tracking-tight leading-tight ${
+          textScale === 'xlarge' ? 'text-3xl sm:text-5xl' : textScale === 'large' ? 'text-2xl sm:text-4xl' : 'text-xl sm:text-3xl'
+        }`}>
           {lang === 'hi'
-            ? 'गीग वर्कर्स के सवालों का ऑटोमैटिक AI वर्गीकरण'
+            ? 'अपनी भाषा में बोलें या लिखें — साथी AI सही जगह मदद करेगा'
             : lang === 'hinglish'
-            ? 'Hinglish, Hindi ya English me bolo — AI sahi system me route karega'
-            : 'Tri-Category Neural Router for Informal & Gig Workers'}
+            ? 'Hinglish, Hindi ya English me bolo — AI turant sahi category me route karega'
+            : 'Voice & Text AI Companion for India’s Delivery & Cab Partners'}
         </h2>
         <p className="mt-2 text-sm sm:text-base text-neutral-600">
           {lang === 'hi'
-            ? 'कोई भी समस्या या सवाल टाइप या बोलें: कमाई का हिसाब, सरकारी योजनाएं, या फाइन/आईडी बैन की शिकायत।'
-            : 'Analyzes natural voice & text across English, Devanagari Hindi, and Hinglish. Emits strictly one category token.'}
+            ? 'कमाई का हिसाब, ई-श्रम व सरकारी योजनाएं, या स्विगी/उबर के गलत फाइन और आईडी ब्लॉक की शिकायत।'
+            : 'Classifies inputs into EARNINGS_TRACKING, WELFARE_SCHEMES, or GRIEVANCE_DRAFTING with full multi-agent support.'}
         </p>
       </div>
 
-      {/* Main Interactive Router Box */}
-      <div className="bg-white rounded-2xl border border-neutral-300 shadow-lg overflow-hidden transition-all">
-        {/* Input Bar */}
-        <div className="p-4 sm:p-6 bg-gradient-to-b from-neutral-50/80 to-white border-b border-neutral-200">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2 flex items-center justify-between">
-            <span>
-              {lang === 'hi'
-                ? 'श्रमिक प्रश्न / समस्या (Worker Input)'
-                : 'Worker Input (English / Hindi / Hinglish)'}
-            </span>
-            <span className="text-[11px] text-neutral-400 font-normal">
-              Press Enter or click Classify
-            </span>
-          </label>
+      {/* Interactive 3-Agent Live Pipeline Visualizer */}
+      <div className="bg-white rounded-2xl border border-neutral-300 p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3 text-xs font-bold text-neutral-500 uppercase tracking-wider font-mono">
+          <span>Multi-Agent Live Execution Pipeline</span>
+          <span className="text-emerald-700 flex items-center gap-1 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            System Online
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          {/* Agent A Box */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            currentStep >= 2
+              ? 'bg-orange-50 border-orange-400 text-orange-950 shadow-2xs'
+              : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+          }`}>
+            <div className="flex items-center justify-between mb-1 font-bold">
+              <span className="flex items-center gap-1.5 text-orange-900">
+                <Terminal className="w-3.5 h-3.5 text-orange-600" />
+                1. Agent A (Core Router)
+              </span>
+              <span className="font-mono text-[10px] bg-orange-200 text-orange-900 px-1.5 rounded">
+                Token Output
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-700">
+              Classifies input into strictly one category token without conversational filler.
+            </p>
+            {result && (
+              <div className="mt-2 text-[11px] font-mono font-black text-orange-900 bg-white/80 p-1.5 rounded border border-orange-300 truncate">
+                ➔ {result.token}
+              </div>
+            )}
+          </div>
+
+          {/* Agent B Box */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            currentStep >= 3
+              ? 'bg-blue-50 border-blue-400 text-blue-950 shadow-2xs'
+              : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+          }`}>
+            <div className="flex items-center justify-between mb-1 font-bold">
+              <span className="flex items-center gap-1.5 text-blue-900">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                2. Agent B (Domain Expert)
+              </span>
+              <span className="font-mono text-[10px] bg-blue-200 text-blue-900 px-1.5 rounded">
+                Logic & Math
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-700">
+              Performs arithmetic, policy analysis, or formal corporate appeal legal structuring.
+            </p>
+            <div className="mt-2 text-[11px] font-mono text-blue-900 bg-white/80 p-1.5 rounded border border-blue-300 truncate">
+              {result?.token === 'EARNINGS_TRACKING'
+                ? 'Gross - Fuel = Net Profit'
+                : result?.token === 'WELFARE_SCHEMES'
+                ? 'Eligibility · Benefits · Process'
+                : 'Telematics Audit Request'}
+            </div>
+          </div>
+
+          {/* Agent C Box */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            currentStep >= 3
+              ? 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-2xs'
+              : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+          }`}>
+            <div className="flex items-center justify-between mb-1 font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-900">
+                <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                3. Agent C (Multilingual Presenter)
+              </span>
+              <span className="font-mono text-[10px] bg-emerald-200 text-emerald-900 px-1.5 rounded">
+                Warm Hinglish
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-700">
+              Presents friendly brotherly tone with clean visual Markdown tables and voice readout.
+            </p>
+            <div className="mt-2 text-[11px] font-mono text-emerald-900 bg-white/80 p-1.5 rounded border border-emerald-300 truncate">
+              Bhai, aapka hisab & tips tayyar!
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Interactive Input Console */}
+      <div className="bg-white rounded-2xl border-2 border-neutral-300 shadow-md overflow-hidden">
+        <div className="p-4 sm:p-6 bg-gradient-to-b from-neutral-50 to-white border-b border-neutral-200">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+              <span>Worker Natural Query (बोलें या लिखें)</span>
+            </label>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-neutral-500 hidden sm:inline">Speed:</span>
+              <select
+                value={speechRate}
+                onChange={(e) => setSpeechRate(Number(e.target.value))}
+                className="bg-white border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-neutral-700 outline-none"
+              >
+                <option value={0.85}>0.85x (Slow/Clear)</option>
+                <option value={0.95}>1.0x (Normal)</option>
+                <option value={1.15}>1.2x (Fast)</option>
+              </select>
+            </div>
+          </div>
 
           <div className="relative">
             <textarea
@@ -239,199 +357,173 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
                   handleClassify();
                 }
               }}
-              placeholder={
-                lang === 'hi'
-                  ? 'उदा. "स्विगी ने बिना वजह 500 रुपये काट लिए, क्या करूँ?" या "ई-श्रम कार्ड कैसे बनेगा?"'
-                  : 'Type or speak in Hinglish/Hindi/English e.g., "Aaj 1200 kamaye 200 fuel me gaye" or "Swiggy ne 500 fine lagaya"'
-              }
-              className="w-full text-base sm:text-lg p-3.5 sm:p-4 rounded-xl border border-neutral-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none text-neutral-900 placeholder:text-neutral-400 bg-white font-sans transition-all resize-none"
+              placeholder='e.g., "Sir, Swiggy ne bina vajah Rs 500 ka fine laga diya, help karo" ya "Aaj 1200 kamaye, 200 fuel me gaye"'
+              className={`w-full p-4 rounded-xl border border-neutral-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none text-neutral-900 placeholder:text-neutral-400 bg-white font-sans transition-all resize-none ${
+                textScale === 'xlarge' ? 'text-xl' : textScale === 'large' ? 'text-lg' : 'text-base'
+              }`}
             />
 
-            <div className="absolute right-3 bottom-3 flex items-center gap-2">
-              {speechSupported && (
+            {/* Accessible Audio & Action Bar */}
+            <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {speechSupported && (
+                  <button
+                    type="button"
+                    onClick={handleSpeechToggle}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-xs transition-all shadow-xs ${
+                      isListening
+                        ? 'bg-red-600 text-white border-red-700 animate-pulse'
+                        : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
+                    }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff className="w-4 h-4 text-white" />
+                        <span>Listening... (Bol rahe hain)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-4 h-4 text-orange-600" />
+                        <span>Bolein (Microphone Voice Input)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 justify-end">
                 <button
                   type="button"
-                  onClick={handleSpeechToggle}
-                  title="Speech-to-Text Input (Hindi/English)"
-                  className={`p-2.5 rounded-lg border transition-all ${
-                    isListening
-                      ? 'bg-red-600 text-white border-red-700 animate-pulse'
-                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-neutral-300'
-                  }`}
+                  onClick={() => setInput('')}
+                  className="px-3 py-2.5 rounded-xl border border-neutral-300 text-neutral-600 hover:bg-neutral-100 text-xs font-semibold"
                 >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  Clear
                 </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => handleClassify()}
-                disabled={loading || !input.trim()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-neutral-950 text-white hover:bg-neutral-800 disabled:opacity-50 font-semibold text-sm transition-all shadow-xs"
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Analyzing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 text-orange-400" />
-                    <span>Classify & Route</span>
-                  </>
-                )}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleClassify()}
+                  disabled={loading || !input.trim()}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-white font-bold text-sm shadow-md transition-all"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-orange-400" />
+                      <span>Classifying & Computing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-orange-400" />
+                      <span>Process & Route</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Live Classification Result Showcase */}
+        {/* Live Result View */}
         {result && (
-          <div className="p-4 sm:p-6">
-            <div className="flex flex-col lg:flex-row items-stretch gap-6">
-              {/* PRIMARY TOKEN EMISSION DISPLAY */}
-              <div
-                className={`flex-1 rounded-xl p-5 border-2 ${
-                  getCategoryTheme(result.token).border
-                } ${getCategoryTheme(result.token).bg} transition-all`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase font-mono tracking-wider font-bold text-neutral-600">
-                    Routing Agent Decision (Mandated Output)
+          <div className="p-4 sm:p-6 space-y-5">
+            {/* AGENT A STRICT TOKEN BADGE */}
+            <div className={`p-5 rounded-2xl border-2 ${getCategoryTheme(result.token).border} ${getCategoryTheme(result.token).bg} shadow-sm`}>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-xs uppercase font-mono font-bold tracking-wider text-neutral-700">
+                    Agent A: Core Router Output Token
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={handleSpeakOutput}
-                      title="Audio Speech Synthesis"
-                      className="p-1.5 rounded-md hover:bg-black/5 text-neutral-700"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleCopyToken}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-white border border-neutral-300 hover:bg-neutral-50 font-medium text-neutral-800 shadow-xs"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-700 font-semibold">Copied Token</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy Token</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
                 </div>
 
-                {/* THE RAW CATEGORY TOKEN - PROMINENT & STRICT */}
-                <div className="bg-neutral-950 text-neutral-100 rounded-lg p-4 font-mono text-center my-2 shadow-inner border border-neutral-800">
-                  <div className="text-[11px] text-neutral-400 uppercase tracking-widest mb-1">
-                    System Category Token
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-black tracking-wider text-amber-400 select-all">
-                    {result.token}
-                  </div>
-                  <div className="text-[11px] text-neutral-400 mt-1">
-                    Confidence: {(result.confidence * 100).toFixed(1)}% · Engine: {result.source}
-                  </div>
-                </div>
-
-                {/* Plain Hindi/English Meaning & Direct Deep Dive */}
-                <div className="mt-4 pt-3 border-t border-black/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-neutral-900 text-base">
-                      {getCategoryTheme(result.token).title}
-                    </h4>
-                    <p className="text-xs text-neutral-600 mt-0.5">{result.reason}</p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSpeakText(`Category token is ${result.token}. ${result.reason}`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-50 text-xs font-bold text-neutral-800 shadow-2xs"
+                    title="Audio read aloud"
+                  >
+                    <Volume2 className="w-4 h-4 text-neutral-700" />
+                    <span>Bolke Suno</span>
+                  </button>
 
                   <button
-                    onClick={() =>
-                      onNavigateToCategory(
-                        result.token,
-                        input
-                      )
-                    }
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 text-sm font-semibold transition-all shadow-xs"
+                    onClick={handleCopyToken}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-50 text-xs font-bold text-neutral-800 shadow-2xs"
                   >
-                    <span>{getCategoryTheme(result.token).actionText}</span>
-                    <ArrowRight className="w-4 h-4 text-orange-400" />
+                    {copiedToken ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-neutral-700" />
+                        <span>Copy Token</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
 
-              {/* TECHNICAL AGENT TERMINAL INSPECTOR */}
-              {showInspector && (
-                <div className="w-full lg:w-80 rounded-xl bg-neutral-950 text-neutral-200 p-4 font-mono text-xs border border-neutral-800 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between pb-2 border-b border-neutral-800 mb-3">
-                      <span className="flex items-center gap-1.5 text-neutral-400 font-bold">
-                        <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                        AGENT RAW LOG
-                      </span>
-                      <span className="text-[10px] text-emerald-400 font-semibold">200 OK</span>
-                    </div>
+              {/* Exact Mandated Token Display */}
+              <div className="bg-neutral-950 text-neutral-100 rounded-xl p-4 font-mono text-center shadow-inner border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 uppercase tracking-widest block mb-1">
+                  Strict Classification Token (Mandated Format)
+                </span>
+                <span className="text-2xl sm:text-4xl font-black text-amber-400 tracking-wider select-all block">
+                  {result.token}
+                </span>
+                <span className="text-[11px] text-neutral-400 mt-1 block">
+                  Confidence: {(result.confidence * 100).toFixed(1)}% · Dialect: {result.detectedLanguage} · Engine: {result.source}
+                </span>
+              </div>
 
-                    <div className="space-y-1.5 text-[11px] leading-relaxed">
-                      <div>
-                        <span className="text-neutral-500">Input:</span>{' '}
-                        <span className="text-neutral-300">"{result.input.slice(0, 45)}..."</span>
-                      </div>
-                      <div>
-                        <span className="text-neutral-500">Dialect:</span>{' '}
-                        <span className="text-amber-300">{result.detectedLanguage}</span>
-                      </div>
-                      <div>
-                        <span className="text-neutral-500">Model:</span>{' '}
-                        <span className="text-sky-400">{result.source}</span>
-                      </div>
-                      <div className="pt-2 border-t border-neutral-800 mt-2">
-                        <span className="text-neutral-500">Strict Output:</span>
-                        <div className="p-2 bg-neutral-900 rounded border border-neutral-700 text-emerald-400 font-bold mt-1 text-sm">
-                          {result.token}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-2 border-t border-neutral-800 text-[10px] text-neutral-500 flex items-center justify-between">
-                    <span>Format: Token-Only</span>
-                    <span className="text-emerald-500">0 Conversational Filler</span>
-                  </div>
+              {/* Action Button & Deep Dive */}
+              <div className="mt-4 pt-3 border-t border-black/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-neutral-900 text-base">
+                    {getCategoryTheme(result.token).title}
+                  </h4>
+                  <p className="text-xs text-neutral-700 mt-0.5">{result.reason}</p>
                 </div>
-              )}
+
+                <button
+                  onClick={() => onNavigateToCategory(result.token, input)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-neutral-950 text-white hover:bg-neutral-800 text-sm font-bold transition-all shadow-md"
+                >
+                  <span>{getCategoryTheme(result.token).actionText}</span>
+                  <ArrowRight className="w-4 h-4 text-orange-400" />
+                </button>
+              </div>
             </div>
 
-            {/* UNIFIED MULTI-AGENT PIPELINE RESPONSE SHOWCASE */}
+            {/* AGENT B & C UNIFIED MULTI-AGENT RESPONSE SHOWCASE */}
             {multiAgentResponse && (
-              <div className="mt-5 pt-4 border-t border-neutral-200">
-                <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 text-white rounded-xl p-4 sm:p-5 border border-neutral-800 shadow-md">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-neutral-800">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                      <span className="font-bold text-xs uppercase font-mono tracking-wider text-emerald-400">
-                        GigSaathi Multi-Agent Workflow Result
-                      </span>
-                      <span className="text-[10px] bg-neutral-800 text-neutral-300 px-2 py-0.5 rounded font-mono">
-                        Router ➔ Expert ➔ Multilingual Presenter
-                      </span>
-                    </div>
+              <div className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900 text-white rounded-2xl p-5 border border-neutral-800 shadow-md">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                    <span className="font-bold text-xs uppercase font-mono tracking-wider text-emerald-400">
+                      GigSaathi Multi-Agent Response (Agent B & C)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSpeakText(multiAgentResponse)}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-neutral-700 transition-all"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>{isPlayingAudio ? 'Stop Audio' : 'Audio Read Aloud'}</span>
+                    </button>
 
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(multiAgentResponse);
-                        setCopiedResponse(true);
-                        setTimeout(() => setCopiedResponse(false), 2000);
-                      }}
-                      className="text-xs px-3 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 flex items-center gap-1 font-medium transition-all"
+                      onClick={handleCopyResponse}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold flex items-center gap-1.5 border border-neutral-700 transition-all"
                     >
                       {copiedResponse ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Copied Output</span>
+                          <span>Copied</span>
                         </>
                       ) : (
                         <>
@@ -441,10 +533,12 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
                       )}
                     </button>
                   </div>
+                </div>
 
-                  <div className="font-sans text-xs sm:text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed bg-neutral-950/80 p-4 rounded-lg border border-neutral-850">
-                    {multiAgentResponse}
-                  </div>
+                <div className={`font-sans text-neutral-200 whitespace-pre-wrap leading-relaxed bg-neutral-950/80 p-4 sm:p-5 rounded-xl border border-neutral-800/80 ${
+                  textScale === 'xlarge' ? 'text-base sm:text-lg' : textScale === 'large' ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'
+                }`}>
+                  {multiAgentResponse}
                 </div>
               </div>
             )}
@@ -452,15 +546,15 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
         )}
       </div>
 
-      {/* QUICK PRESET SCENARIOS (Including all 3 exact Prompt Examples) */}
-      <div className="mt-8">
+      {/* QUICK BENCHMARK PRESETS (1-Tap for High Accessibility) */}
+      <div className="bg-white rounded-2xl border border-neutral-300 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-orange-600" />
             <h3 className="font-bold text-neutral-900 text-sm uppercase tracking-wide">
               {lang === 'hi'
-                ? 'परीक्षण उदाहरण (Prompt Examples & Real Scenarios)'
-                : 'Canonical Benchmark Examples & Test Queries'}
+                ? '1-क्लिक परीक्षण प्रश्न (बिना टाइप किए तुरंत आज़माएँ)'
+                : '1-Tap Interactive Queries (No Typing Required)'}
             </h3>
           </div>
 
@@ -468,40 +562,40 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
             <span className="text-neutral-500">Filter:</span>
             <button
               onClick={() => setActiveFilter('all')}
-              className={`px-2 py-0.5 rounded text-xs ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
                 activeFilter === 'all'
-                  ? 'bg-neutral-800 text-white font-semibold'
-                  : 'text-neutral-600 hover:bg-neutral-200'
+                  ? 'bg-neutral-900 text-white'
+                  : 'text-neutral-700 hover:bg-neutral-200'
               }`}
             >
               All
             </button>
             <button
               onClick={() => setActiveFilter('EARNINGS_TRACKING')}
-              className={`px-2 py-0.5 rounded text-xs ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
                 activeFilter === 'EARNINGS_TRACKING'
-                  ? 'bg-emerald-700 text-white font-semibold'
-                  : 'text-neutral-600 hover:bg-neutral-200'
+                  ? 'bg-emerald-800 text-white'
+                  : 'text-neutral-700 hover:bg-neutral-200'
               }`}
             >
               Earnings
             </button>
             <button
               onClick={() => setActiveFilter('WELFARE_SCHEMES')}
-              className={`px-2 py-0.5 rounded text-xs ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
                 activeFilter === 'WELFARE_SCHEMES'
-                  ? 'bg-blue-700 text-white font-semibold'
-                  : 'text-neutral-600 hover:bg-neutral-200'
+                  ? 'bg-blue-800 text-white'
+                  : 'text-neutral-700 hover:bg-neutral-200'
               }`}
             >
               Welfare
             </button>
             <button
               onClick={() => setActiveFilter('GRIEVANCE_DRAFTING')}
-              className={`px-2 py-0.5 rounded text-xs ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
                 activeFilter === 'GRIEVANCE_DRAFTING'
-                  ? 'bg-amber-700 text-white font-semibold'
-                  : 'text-neutral-600 hover:bg-neutral-200'
+                  ? 'bg-amber-800 text-white'
+                  : 'text-neutral-700 hover:bg-neutral-200'
               }`}
             >
               Grievance
@@ -519,34 +613,34 @@ export const RouterHero: React.FC<RouterHeroProps> = ({
                 setInput(ex.input);
                 handleClassify(ex.input);
               }}
-              className="group p-3.5 rounded-xl border border-neutral-200 hover:border-orange-500/60 bg-white hover:bg-orange-50/20 cursor-pointer transition-all shadow-xs hover:shadow-md flex flex-col justify-between"
+              className="group p-4 rounded-xl border border-neutral-200 hover:border-orange-500 bg-neutral-50/50 hover:bg-orange-50/20 cursor-pointer transition-all shadow-2xs hover:shadow-md flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between text-[11px] mb-1.5">
-                  <span className="font-semibold text-neutral-500 uppercase tracking-wider">
+                <div className="flex items-center justify-between text-[11px] mb-2">
+                  <span className="font-bold text-neutral-600 uppercase tracking-wider">
                     {ex.label}
                   </span>
                   <span
-                    className={`font-mono px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                    className={`font-mono px-2 py-0.5 rounded text-[10px] font-black ${
                       ex.expectedCategory === 'EARNINGS_TRACKING'
-                        ? 'bg-emerald-100 text-emerald-800'
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                         : ex.expectedCategory === 'WELFARE_SCHEMES'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-amber-100 text-amber-800'
+                        ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                        : 'bg-amber-100 text-amber-900 border border-amber-300'
                     }`}
                   >
                     {ex.expectedCategory}
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-neutral-800 font-medium line-clamp-3">
+                <p className="text-xs sm:text-sm text-neutral-900 font-medium line-clamp-3">
                   "{ex.input}"
                 </p>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
-                <span>Language: {ex.language}</span>
-                <span className="text-orange-600 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  Test Route <ArrowRight className="w-3 h-3" />
+              <div className="mt-3 pt-2.5 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500 font-medium">
+                <span>{ex.language}</span>
+                <span className="text-orange-600 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                  1-Tap Route <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </div>
             </div>

@@ -4,6 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
+import { sanitizeInput, rateLimiter } from './src/utils/security.ts';
+import { routeCache, companionCache } from './src/utils/cache.ts';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +15,33 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Security & Parsing Middlewares
+app.use(express.json({ limit: '256kb' }));
+
+// Enterprise Security Headers Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'microphone=*');
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    res.setHeader('X-Response-Time', `${duration}ms`);
+  });
+  next();
+});
+
+// API Rate Limiting Middleware
+app.use('/api', (req, res, next) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+  if (!rateLimiter.isAllowed(clientIp)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again in a minute.' });
+  }
+  next();
+});
 
 // Initialize GoogleGenAI client
 const apiKey = process.env.GEMINI_API_KEY || '';
@@ -90,8 +119,8 @@ export function ruleBasedClassifier(input: string): {
   if (text.includes('swiggy ne bina vajah') || text.includes('fine laga diya') || text.includes('account suspend')) {
     grievanceScore += 10;
   }
-  if (text.includes('e-shram') || text.includes('eshram') || text.includes('card kaise banega')) {
-    welfareScore += 10;
+  if (text.includes('e-shram') || text.includes('eshram') || text.includes('card kaise banega') || text.includes('accident insurance') || text.includes('accident bima')) {
+    welfareScore += 15;
   }
   if (text.includes('rides ki') || text.includes('fuel me gaye') || text.includes('kamaye') || text.includes('hisaab')) {
     earningsScore += 10;
