@@ -1,0 +1,6 @@
+{
+  "name": "GigSaathi - Core AI Routing & Assistance for Gig Workers",
+  "description": "AI router and assistant for informal and gig workers (drivers, delivery partners, daily-wage laborers) that classifies inputs into EARNINGS_TRACKING, WELFARE_SCHEMES, or GRIEVANCE_DRAFTING.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
